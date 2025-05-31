@@ -1,14 +1,14 @@
 #include "raylib.h"
 #include "raymath.h"
 
-#define WYSOKOWSC_OKNA 600
-#define SZEROKOSC_OKNA 600
+#define WINDOW_HEIGHT 600
+#define WINDOW_WIDTH 600
 
 #define COLS 12
 #define ROWS 12
 
-const int KAFELEK_WYSOKOSC = WYSOKOWSC_OKNA / ROWS;
-const int KAFELEK_SZEROKOSC = SZEROKOSC_OKNA / COLS;
+const int TILE_HEIGHT = WINDOW_HEIGHT / ROWS;
+const int TILE_WIDTH = WINDOW_WIDTH / COLS;
 
 typedef struct
 {
@@ -18,21 +18,21 @@ typedef struct
     bool isRevealed;
     bool isFlagged;
     int nearbyMineCount;
-} sKafelek;
+} sTile;
 
-sKafelek grid[COLS][ROWS];
-int LiczbaWyswietlonychKafelkow;
-int LiczbObecnychMin;
+sTile grid[COLS][ROWS];
+int revealedTilesCount;
+int currentMinesCount;
 
-float czasStart;
-float czasKoniec;
+float timeStart;
+float timeEnd;
 
-const char* Wygrana = "Wygrales";
-const char* Porazka = "Przegrales";
-const char* Enterowanie = "ENTER ABY WROCIC DO MENU";
+const char* Victory = "Wygrales";
+const char* Defeat = "Przegrales";
+const char* EnterPrompt = "ENTER ABY WROCIC DO MENU";
 
-bool muzykaWloczona = true;
-bool dzwiekiWloczone = true;
+bool musicEnabled = true;
+bool soundEnabled = true;
 
 #define MAX_TEXTURES 1
 typedef enum
@@ -45,62 +45,61 @@ Texture2D textures[MAX_TEXTURES];
 #define MAX_SOUNDS 3
 typedef enum
 {
-    MUZYKA_JEDEN = 0,
-    MUZYKA_DWA,
-    MUZYKA_TRZY
-}dzwieki_assety;
+    SOUND_ONE = 0,
+    SOUND_TWO,
+    SOUND_THREE
+} sound_assets;
 
-Sound dzwieki[MAX_SOUNDS];
+Sound sounds[MAX_SOUNDS];
 
 #define MAX_MUS 1
 typedef enum
 {
-    MUZYKA = 0
-} muzyka_assety;
+    MUSIC = 0
+} music_assets;
 
-Music muzyka[MAX_MUS];
-
+Music music[MAX_MUS];
 
 typedef enum
 {
-    STAN_MAIN_MENU = 0,
-    STAN_OPCJE,
-    STAN_GRA,
-    STAN_PRZEGRANA,
-    STAN_WYGRANA
-} stany;
+    STATE_MAIN_MENU = 0,
+    STATE_OPTIONS,
+    STATE_GAME,
+    STATE_DEFEAT,
+    STATE_VICTORY
+} states;
 
-stany stanyGry;
+states gameState;
 
 void GameStartup();
 void GameUpdate();
 void GameShutdown();
 void GameRender();
-void GameReser();
-void ResetKafelkow();
-void RenderKafelki();
-void RenderKafelka(sKafelek);
-int LiczMinyWokol(int, int);
-bool IndexKafelkajestPrawidlowy(int, int);
-void WyswietlKafelek(int, int);
-void FlagujKafelek(int, int);
-void WyswietlKafelki(int, int);
-void WydajDzwiek(int sound);
+void GameReset();
+void ResetTiles();
+void RenderTiles();
+void RenderTile(sTile);
+int CountNearbyMines(int, int);
+bool IsTileIndexValid(int, int);
+void RevealTile(int, int);
+void FlagTile(int, int);
+void RevealTiles(int, int);
+void PlayGameSound(int sound);
 
-void WydajDzwiek(int sound)
+void PlayGameSound(int sound)
 {
-    if (dzwiekiWloczone)
+    if (soundEnabled)
     {
-    PlaySound(dzwieki[sound]);
+        PlaySound(sounds[sound]);
     }
 }
 
-bool IndexKafelkajestPrawidlowy(int col, int row)
+bool IsTileIndexValid(int col, int row)
 {
     return col >= 0 && col < COLS && row >= 0 && row < ROWS;
 }
 
-void WyswietlKafelki(int col, int row)
+void RevealTiles(int col, int row)
 {
     for (int colOffset = -1; colOffset <= 1; colOffset++)
     {
@@ -111,28 +110,27 @@ void WyswietlKafelki(int col, int row)
                 continue;
             }
 
-            if (!IndexKafelkajestPrawidlowy(col + colOffset, row + rowOffset))
+            if (!IsTileIndexValid(col + colOffset, row + rowOffset))
             {
                 continue;
             }
 
-            WyswietlKafelek(col + colOffset, row + rowOffset);
+            RevealTile(col + colOffset, row + rowOffset);
         }
     }
 }
 
-void FlagujKafelek(int col, int row)
+void FlagTile(int col, int row)
 {
     if (grid[col][row].isFlagged)
     {
         return;
     }
     grid[col][row].isFlagged = !grid[col][row].isFlagged;
-    WydajDzwiek(MUZYKA_TRZY);
-    
+    PlayGameSound(SOUND_THREE);
 }
 
-void WyswietlKafelek(int col, int row)
+void RevealTile(int col, int row)
 {
     if (grid[col][row].isFlagged ||
         grid[col][row].isRevealed)
@@ -144,29 +142,27 @@ void WyswietlKafelek(int col, int row)
 
     if (grid[col][row].isMine)
     {
-        //Koniec gry - przegrana
-        stanyGry = STAN_PRZEGRANA;
-        czasKoniec = (float)GetTime();
-        WydajDzwiek(MUZYKA_DWA);
+        gameState = STATE_DEFEAT;
+        timeEnd = (float)GetTime();
+        PlayGameSound(SOUND_TWO);
     }
     else 
     {
         if (grid[col][row].nearbyMineCount == 0)
         {
-            WyswietlKafelki(col, row);
+            RevealTiles(col, row);
         }
-        LiczbaWyswietlonychKafelkow++;
+        revealedTilesCount++;
 
-        if (LiczbaWyswietlonychKafelkow >= (ROWS * COLS - LiczbObecnychMin)) 
+        if (revealedTilesCount >= (ROWS * COLS - currentMinesCount)) 
         {
-            //Koniec Gry - wygrana
-            stanyGry = STAN_WYGRANA;
-            czasKoniec = (float)GetTime();
+            gameState = STATE_VICTORY;
+            timeEnd = (float)GetTime();
         }
     }
 }
 
-int LiczMinyWokol(int col, int row)
+int CountNearbyMines(int col, int row)
 {
     int count = 0;
     for (int colOffset = -1; colOffset <= 1; colOffset++)
@@ -178,25 +174,23 @@ int LiczMinyWokol(int col, int row)
                 continue;
             }
 
-            if (IndexKafelkajestPrawidlowy(col + colOffset, row + rowOffset)) {
+            if (IsTileIndexValid(col + colOffset, row + rowOffset)) {
                 if (grid[col + colOffset][row + rowOffset].isMine) {
                     count++;
                 }
             }
-
         }
     }
     return count;
 }
 
-
-void ResetKafelkow()
+void ResetTiles()
 {
     for (int i = 0; i < COLS; i++) 
     {
         for (int j = 0; j < ROWS; j++)
         {
-            grid[i][j] = (sKafelek)
+            grid[i][j] = (sTile)
             {
                 .x = i,
                 .y = j,
@@ -208,9 +202,9 @@ void ResetKafelkow()
         }
     }
 
-    LiczbObecnychMin = (int)(ROWS * COLS * 0.15f);
-    int minyDoUmiejscowienia = LiczbObecnychMin;
-    while (minyDoUmiejscowienia > 0)
+    currentMinesCount = (int)(ROWS * COLS * 0.15f);
+    int minesToPlace = currentMinesCount;
+    while (minesToPlace > 0)
     {
         int col = GetRandomValue(0, COLS - 1);
         int row = GetRandomValue(0, ROWS - 1);
@@ -218,7 +212,7 @@ void ResetKafelkow()
         if (!grid[col][row].isMine)
         {
             grid[col][row].isMine = true;
-            minyDoUmiejscowienia--;
+            minesToPlace--;
         }
     }
 
@@ -228,50 +222,46 @@ void ResetKafelkow()
         {
             if (!grid[i][j].isMine)
             {
-                grid[i][j].nearbyMineCount = LiczMinyWokol(i, j);
+                grid[i][j].nearbyMineCount = CountNearbyMines(i, j);
             }
         }
     }
 }
 
-
-void RenderKafelka(sKafelek kafelek)
+void RenderTile(sTile tile)
 {
-    if (kafelek.isRevealed)
+    if (tile.isRevealed)
     {
-        if (kafelek.isMine)
+        if (tile.isMine)
         {
-            DrawRectangle(kafelek.x * KAFELEK_SZEROKOSC, kafelek.y * KAFELEK_WYSOKOSC, KAFELEK_SZEROKOSC, KAFELEK_WYSOKOSC, RED);
-
+            DrawRectangle(tile.x * TILE_WIDTH, tile.y * TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT, RED);
         }
         else
         {
-            DrawRectangle(kafelek.x * KAFELEK_SZEROKOSC, kafelek.y * KAFELEK_WYSOKOSC, KAFELEK_SZEROKOSC, KAFELEK_WYSOKOSC, LIGHTGRAY);
-            if (kafelek.nearbyMineCount > 0)
+            DrawRectangle(tile.x * TILE_WIDTH, tile.y * TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT, LIGHTGRAY);
+            if (tile.nearbyMineCount > 0)
             {
-                DrawText(TextFormat("%d", kafelek.nearbyMineCount), kafelek.x * KAFELEK_SZEROKOSC + 13, kafelek.y * KAFELEK_WYSOKOSC + 4, KAFELEK_WYSOKOSC - 8, DARKGRAY);
-
+                DrawText(TextFormat("%d", tile.nearbyMineCount), tile.x * TILE_WIDTH + 13, tile.y * TILE_HEIGHT + 4, TILE_HEIGHT - 8, DARKGRAY);
             }
         }
     }
-    else if (kafelek.isFlagged)
+    else if (tile.isFlagged)
     {
         Rectangle source = { 0, 0, (float)textures[TEXTURE_FLAG].width, (float)textures[TEXTURE_FLAG].height };
-        Rectangle dest = { (float)(kafelek.x * KAFELEK_SZEROKOSC), (float)(kafelek.y * KAFELEK_WYSOKOSC), (float)KAFELEK_SZEROKOSC, (float)KAFELEK_WYSOKOSC };
-        Vector2 orgin = { 0, 0 };
-        DrawTexturePro(textures[TEXTURE_FLAG], source, dest, orgin, 0.0f, WHITE);
+        Rectangle dest = { (float)(tile.x * TILE_WIDTH), (float)(tile.y * TILE_HEIGHT), (float)TILE_WIDTH, (float)TILE_HEIGHT };
+        Vector2 origin = { 0, 0 };
+        DrawTexturePro(textures[TEXTURE_FLAG], source, dest, origin, 0.0f, WHITE);
     }
-    DrawRectangleLines(kafelek.x * KAFELEK_SZEROKOSC, kafelek.y * KAFELEK_WYSOKOSC, KAFELEK_SZEROKOSC, KAFELEK_WYSOKOSC, WHITE);
+    DrawRectangleLines(tile.x * TILE_WIDTH, tile.y * TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT, WHITE);
 }
 
-
-void RenderKafelki()
+void RenderTiles()
 {
     for (int i = 0; i < COLS; i++)
     {
         for (int j = 0; j < ROWS; j++)
         {
-            RenderKafelka(grid[i][j]);
+            RenderTile(grid[i][j]);
         }
     }
 }
@@ -284,127 +274,118 @@ void GameStartup()
     textures[TEXTURE_FLAG] = LoadTextureFromImage(image1);
     UnloadImage(image1);
 
-    dzwieki[MUZYKA_JEDEN] = LoadSound("resources\\dzwiek1.mp3");
-    dzwieki[MUZYKA_DWA] = LoadSound("resources\\dzwiek2.mp3");
-    dzwieki[MUZYKA_TRZY] = LoadSound("resources\\dzwiek3.mp3");
+    sounds[SOUND_ONE] = LoadSound("resources\\dzwiek1.mp3");
+    sounds[SOUND_TWO] = LoadSound("resources\\dzwiek2.mp3");
+    sounds[SOUND_THREE] = LoadSound("resources\\dzwiek3.mp3");
 
-    muzyka[MUZYKA] = LoadMusicStream("resources\\muzyka.mp3");
+    music[MUSIC] = LoadMusicStream("resources\\muzyka.mp3");
+    PlayMusicStream(music[MUSIC]);
 
-    PlayMusicStream(muzyka[MUZYKA]);
-
-    stanyGry = STAN_MAIN_MENU;
+    gameState = STATE_MAIN_MENU;
 }
+
 void GameUpdate()
 {
-    UpdateMusicStream(muzyka[MUZYKA]);
+    UpdateMusicStream(music[MUSIC]);
 
-    switch (stanyGry)
+    switch (gameState)
     {
-    case STAN_MAIN_MENU:
-        
+    case STATE_MAIN_MENU:
         if (IsKeyPressed(KEY_N))
         {
-            WydajDzwiek(MUZYKA_DWA);
-            GameReser();
+            PlayGameSound(SOUND_TWO);
+            GameReset();
         }
         else if (IsKeyPressed(KEY_O))
         {
-            stanyGry = STAN_OPCJE;
-            WydajDzwiek(MUZYKA_DWA);
+            gameState = STATE_OPTIONS;
+            PlayGameSound(SOUND_TWO);
         }
         break;
-    case STAN_OPCJE:
 
+    case STATE_OPTIONS:
         if (IsKeyPressed(KEY_ENTER))
         {
-            stanyGry = STAN_MAIN_MENU;
-            WydajDzwiek(MUZYKA_DWA);
+            gameState = STATE_MAIN_MENU;
+            PlayGameSound(SOUND_TWO);
         }
 
         if (IsKeyPressed(KEY_D))
         {
-            dzwiekiWloczone = !dzwiekiWloczone;
-            WydajDzwiek(MUZYKA_JEDEN);
+            soundEnabled = !soundEnabled;
+            PlayGameSound(SOUND_ONE);
         }
         if (IsKeyPressed(KEY_M))
         {
-            muzykaWloczona = !muzykaWloczona;
-            WydajDzwiek(MUZYKA_JEDEN);
-            if (muzykaWloczona)
+            musicEnabled = !musicEnabled;
+            PlayGameSound(SOUND_ONE);
+            if (musicEnabled)
             {
-                StopMusicStream(muzyka[MUZYKA]);
-                PlayMusicStream(muzyka[MUZYKA]);
+                StopMusicStream(music[MUSIC]);
+                PlayMusicStream(music[MUSIC]);
             }
             else
             {
-                StopMusicStream(muzyka[MUZYKA]);
+                StopMusicStream(music[MUSIC]);
             }
         }
         break;
-    case STAN_GRA:
+
+    case STATE_GAME:
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
         {
-            Vector2 pozycjaMyszy = GetMousePosition();
-            int col = (int)(pozycjaMyszy.x / KAFELEK_SZEROKOSC);
-            int row = (int)(pozycjaMyszy.y / KAFELEK_WYSOKOSC);
+            Vector2 mousePos = GetMousePosition();
+            int col = (int)(mousePos.x / TILE_WIDTH);
+            int row = (int)(mousePos.y / TILE_HEIGHT);
 
-            if (IndexKafelkajestPrawidlowy(col, row))
+            if (IsTileIndexValid(col, row))
             {
-                WyswietlKafelek(col, row);
-                WydajDzwiek(MUZYKA_JEDEN);
+                RevealTile(col, row);
+                PlayGameSound(SOUND_ONE);
             }
         }
         else if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
         {
-            Vector2 pozycjaMyszy = GetMousePosition();
-            int col = (int)(pozycjaMyszy.x / KAFELEK_SZEROKOSC);
-            int row = (int)(pozycjaMyszy.y / KAFELEK_WYSOKOSC);
-            if (IndexKafelkajestPrawidlowy(col, row))
+            Vector2 mousePos = GetMousePosition();
+            int col = (int)(mousePos.x / TILE_WIDTH);
+            int row = (int)(mousePos.y / TILE_HEIGHT);
+            if (IsTileIndexValid(col, row))
             {
-                FlagujKafelek(col, row);
+                FlagTile(col, row);
             }
         }
         break;
-    case STAN_PRZEGRANA:
 
+    case STATE_DEFEAT:
+    case STATE_VICTORY:
         if (IsKeyPressed(KEY_ENTER))
         {
-            WydajDzwiek(MUZYKA_DWA);
-
-            stanyGry = STAN_MAIN_MENU;
-        }
-        break;
-    case STAN_WYGRANA:
-
-        if (IsKeyPressed(KEY_ENTER))
-        {
-            WydajDzwiek(MUZYKA_DWA);
-
-            stanyGry = STAN_MAIN_MENU;
+            PlayGameSound(SOUND_TWO);
+            gameState = STATE_MAIN_MENU;
         }
         break;
     }
-
-
 }
+
 void GameRender()
 {
-    int sekundy = 0;
+    int seconds = 0;
 
-    switch (stanyGry)
+    switch (gameState)
     {
-    case STAN_MAIN_MENU:
-        DrawRectangle(0, 0, SZEROKOSC_OKNA, WYSOKOWSC_OKNA, PINK);
+    case STATE_MAIN_MENU:
+        DrawRectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, PINK);
         DrawText("SAPER", 20, 20, 40, WHITE);
         DrawText("[N]owa Gra", 120, 220, 20, WHITE);
         DrawText("[O]pcje", 120, 250, 20, WHITE);
         DrawText("ESC aby WYJSC", 120, 280, 20, WHITE);
         break;
-    case STAN_OPCJE:
-        DrawRectangle(0, 0, SZEROKOSC_OKNA, WYSOKOWSC_OKNA, GRAY);
+
+    case STATE_OPTIONS:
+        DrawRectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, GRAY);
         DrawText("SAPER - OPCJE", 20, 20, 40, WHITE);
-        DrawText("[D]zieki", 120, 220, 20, WHITE);
-        if (dzwiekiWloczone)
+        DrawText("[D]zwieki", 120, 220, 20, WHITE);
+        if (soundEnabled)
         {
             DrawText("WLACZONE", 250, 220, 20, YELLOW);
             DrawText("/", 365, 220, 20, WHITE);
@@ -417,7 +398,7 @@ void GameRender()
             DrawText("WYLACZONE", 385, 220, 20, YELLOW);
         }
         DrawText("[M]uzyka", 120, 250, 20, WHITE);
-        if (muzykaWloczona)
+        if (musicEnabled)
         {
             DrawText("WLACZONE", 250, 250, 20, YELLOW);
             DrawText("/", 365, 250, 20, WHITE);
@@ -429,29 +410,33 @@ void GameRender()
             DrawText("/", 365, 250, 20, WHITE);
             DrawText("WYLACZONE", 385, 250, 20, YELLOW);
         }
-        DrawText(Enterowanie, SZEROKOSC_OKNA / 2 - MeasureText(Enterowanie, 34) / 2, (int)(WYSOKOWSC_OKNA * 0.75f) - 10, 34, DARKGRAY);
+        DrawText(EnterPrompt, WINDOW_WIDTH / 2 - MeasureText(EnterPrompt, 34) / 2, (int)(WINDOW_HEIGHT * 0.75f) - 10, 34, DARKGRAY);
         break;
-    case STAN_GRA:
-        RenderKafelki();
+
+    case STATE_GAME:
+        RenderTiles();
         break;
-    case STAN_PRZEGRANA:
-        RenderKafelki();
-        DrawRectangle(0, 0, SZEROKOSC_OKNA, WYSOKOWSC_OKNA, Fade(WHITE, 0.8f));
-        DrawText(Porazka, SZEROKOSC_OKNA / 2 - MeasureText(Porazka, 60) / 2, WYSOKOWSC_OKNA / 2 - 10, 60, DARKGRAY);
-        DrawText(Enterowanie, SZEROKOSC_OKNA / 2 - MeasureText(Enterowanie, 34) / 2, (int)(WYSOKOWSC_OKNA * 0.75f) - 10, 34, DARKGRAY);
-        sekundy = (int)(czasKoniec - czasStart) % 60;
-        DrawText(TextFormat("TIME PLAYED: %d s", sekundy), 20, 40, 34, DARKGRAY);
+
+    case STATE_DEFEAT:
+        RenderTiles();
+        DrawRectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, Fade(WHITE, 0.8f));
+        DrawText(Defeat, WINDOW_WIDTH / 2 - MeasureText(Defeat, 60) / 2, WINDOW_HEIGHT / 2 - 10, 60, DARKGRAY);
+        DrawText(EnterPrompt, WINDOW_WIDTH / 2 - MeasureText(EnterPrompt, 34) / 2, (int)(WINDOW_HEIGHT * 0.75f) - 10, 34, DARKGRAY);
+        seconds = (int)(timeEnd - timeStart) % 60;
+        DrawText(TextFormat("TIME PLAYED: %d s", seconds), 20, 40, 34, DARKGRAY);
         break;
-    case STAN_WYGRANA:
-        RenderKafelki();
-        DrawRectangle(0, 0, SZEROKOSC_OKNA, WYSOKOWSC_OKNA, Fade(WHITE, 0.8f));
-        DrawText(Wygrana, SZEROKOSC_OKNA / 2 - MeasureText(Porazka, 60) / 2, WYSOKOWSC_OKNA / 2 - 10, 60, DARKGRAY);
-        DrawText(Enterowanie, SZEROKOSC_OKNA / 2 - MeasureText(Enterowanie, 34) / 2, (int)(WYSOKOWSC_OKNA * 0.75f) - 10, 34, DARKGRAY);
-        sekundy = (int)(czasKoniec - czasStart) % 60;
-        DrawText(TextFormat("TIME PLAYED: %d s", sekundy), 20, 40, 34, DARKGRAY);
+
+    case STATE_VICTORY:
+        RenderTiles();
+        DrawRectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, Fade(WHITE, 0.8f));
+        DrawText(Victory, WINDOW_WIDTH / 2 - MeasureText(Victory, 60) / 2, WINDOW_HEIGHT / 2 - 10, 60, DARKGRAY);
+        DrawText(EnterPrompt, WINDOW_WIDTH / 2 - MeasureText(EnterPrompt, 34) / 2, (int)(WINDOW_HEIGHT * 0.75f) - 10, 34, DARKGRAY);
+        seconds = (int)(timeEnd - timeStart) % 60;
+        DrawText(TextFormat("TIME PLAYED: %d s", seconds), 20, 40, 34, DARKGRAY);
         break;
-    };
+    }
 }
+
 void GameShutdown()
 {
     for (int i = 0; i < MAX_TEXTURES; i++)
@@ -459,32 +444,31 @@ void GameShutdown()
         UnloadTexture(textures[i]);
     }
 
-    StopMusicStream(muzyka[MUZYKA]);
+    StopMusicStream(music[MUSIC]);
     for (int i = 0; i < MAX_MUS; i++)
     {
-        UnloadMusicStream(muzyka[i]);
+        UnloadMusicStream(music[i]);
     }
 
     for (int i = 0; i < MAX_SOUNDS; i++)
     {
-        UnloadSound(dzwieki[i]);
+        UnloadSound(sounds[i]);
     }
 
     CloseAudioDevice();
 }
-void GameReser()
+
+void GameReset()
 {
-    LiczbaWyswietlonychKafelkow = 0;
-    czasStart = (float)GetTime();
-    ResetKafelkow();
-    stanyGry = STAN_GRA;
+    revealedTilesCount = 0;
+    timeStart = (float)GetTime();
+    ResetTiles();
+    gameState = STATE_GAME;
 }
-
-
 
 int main()
 {
-    InitWindow(WYSOKOWSC_OKNA, SZEROKOSC_OKNA, "SAPER");
+    InitWindow(WINDOW_HEIGHT, WINDOW_WIDTH, "SAPER");
     SetTargetFPS(60);
     GameStartup();
 
@@ -493,9 +477,7 @@ int main()
         GameUpdate();
         BeginDrawing();
         ClearBackground(DARKBLUE);
-
         GameRender();
-
         EndDrawing();
     }
 
