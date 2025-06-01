@@ -33,7 +33,7 @@ void ResetTiles(void)
         }
     }
 
-    currentMinesCount = (int)1;//(ROWS * COLS * 0.15f);
+    currentMinesCount = (int)(ROWS * COLS * 0.15f);
     int minesToPlace = currentMinesCount;
     while (minesToPlace > 0)
     {

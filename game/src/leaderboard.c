@@ -9,9 +9,9 @@ Score scores[MAX_SCORES];
 
 void InitLeaderboard(void) {
     for (int i = 0; i < MAX_SCORES; i++) {
-        scores[i].seconds = 999;
-        strcpy(scores[i].date, "...");
-        strcpy(scores[i].time, "...");
+        scores[i].seconds = -1;
+        strcpy(scores[i].date, "-");
+        strcpy(scores[i].time, "-");
         scores[i].isPlaceholder = true;
     }
     LoadLeaderboard();
@@ -71,11 +71,20 @@ void RenderLeaderboard(void) {
     for (int i = 0; i < MAX_SCORES; i++) {
         Color color = scores[i].isPlaceholder ? GRAY : WHITE;
         char scoreText[100];
-        sprintf(scoreText, "%2d. %.2f sec  %s  %s",
-                i + 1, 
-                scores[i].seconds,
-                scores[i].date,
-                scores[i].time);
+        
+        if (scores[i].isPlaceholder) {
+            sprintf(scoreText, "%2d. -:--  %s  %s",
+                    i + 1, 
+                    scores[i].date,
+                    scores[i].time);
+        } else {
+            sprintf(scoreText, "%2d. %.2f sec  %s  %s",
+                    i + 1, 
+                    scores[i].seconds,
+                    scores[i].date,
+                    scores[i].time);
+        }
+        
         DrawText(scoreText, 50, 100 + i * 40, 20, color);
     }
 
