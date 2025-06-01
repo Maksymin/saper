@@ -2,6 +2,8 @@
 #include "include/game.h"
 #include "include/grid.h"
 #include "include/audio.h"
+#include "include/leaderboard.h"
+
 #include "raylib.h"
 
 // Global variables
@@ -12,6 +14,7 @@ float timeStart;
 float timeEnd;
 bool musicEnabled = true;
 bool soundEnabled = true;
+bool scoreAdded = false;
 Texture2D textures[MAX_TEXTURES];
 Sound sounds[MAX_SOUNDS];
 Music music[MAX_MUS];
@@ -24,6 +27,7 @@ const char* EnterPrompt = "ENTER ABY WROCIC DO MENU";
 void GameStartup(void)
 {
     InitAudio();
+    InitLeaderboard();
     Image image1 = LoadImage("resources\\flag.png");
     textures[TEXTURE_FLAG] = LoadTextureFromImage(image1);
     UnloadImage(image1);
@@ -46,6 +50,10 @@ void GameUpdate(void)
         else if (IsKeyPressed(KEY_O))
         {
             gameState = STATE_OPTIONS;
+            PlayGameSound(SOUND_TWO);
+        }
+        else if (IsKeyPressed(KEY_L)) {
+            gameState = STATE_LEADERBOARD;
             PlayGameSound(SOUND_TWO);
         }
         break;
@@ -77,6 +85,13 @@ void GameUpdate(void)
         }
         break;
 
+    case STATE_LEADERBOARD:
+        if (IsKeyPressed(KEY_ENTER)) {
+            gameState = STATE_MAIN_MENU;
+            PlayGameSound(SOUND_TWO);
+        }
+        break;
+
     case STATE_GAME:
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
         {
@@ -103,6 +118,10 @@ void GameUpdate(void)
 
     case STATE_DEFEAT:
     case STATE_VICTORY:
+        if (!scoreAdded) {
+            AddNewScore((int)(timeEnd - timeStart));
+            scoreAdded = true;
+        }
         if (IsKeyPressed(KEY_ENTER))
         {
             PlayGameSound(SOUND_TWO);
@@ -123,7 +142,8 @@ void GameRender(void)
         DrawText("SAPER", 20, 20, 40, WHITE);
         DrawText("[N]owa Gra", 120, 220, 20, WHITE);
         DrawText("[O]pcje", 120, 250, 20, WHITE);
-        DrawText("ESC aby WYJSC", 120, 280, 20, WHITE);
+        DrawText("[L]eaderboard", 120, 280, 20, WHITE);
+        DrawText("ESC aby WYJSC", 120, 310, 20, WHITE);
         break;
 
     case STATE_OPTIONS:
@@ -158,6 +178,10 @@ void GameRender(void)
         DrawText(EnterPrompt, WINDOW_WIDTH / 2 - MeasureText(EnterPrompt, 34) / 2, (int)(WINDOW_HEIGHT * 0.75f) - 10, 34, DARKGRAY);
         break;
 
+    case STATE_LEADERBOARD:
+        RenderLeaderboard();
+        break;
+
     case STATE_GAME:
         RenderTiles();
         break;
@@ -167,7 +191,7 @@ void GameRender(void)
         DrawRectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, Fade(WHITE, 0.8f));
         DrawText(Defeat, WINDOW_WIDTH / 2 - MeasureText(Defeat, 60) / 2, WINDOW_HEIGHT / 2 - 10, 60, DARKGRAY);
         DrawText(EnterPrompt, WINDOW_WIDTH / 2 - MeasureText(EnterPrompt, 34) / 2, (int)(WINDOW_HEIGHT * 0.75f) - 10, 34, DARKGRAY);
-        seconds = (int)(timeEnd - timeStart) % 60;
+        seconds = (int)(timeEnd - timeStart);
         DrawText(TextFormat("TIME PLAYED: %d s", seconds), 20, 40, 34, DARKGRAY);
         break;
 
@@ -176,7 +200,7 @@ void GameRender(void)
         DrawRectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, Fade(WHITE, 0.8f));
         DrawText(Victory, WINDOW_WIDTH / 2 - MeasureText(Victory, 60) / 2, WINDOW_HEIGHT / 2 - 10, 60, DARKGRAY);
         DrawText(EnterPrompt, WINDOW_WIDTH / 2 - MeasureText(EnterPrompt, 34) / 2, (int)(WINDOW_HEIGHT * 0.75f) - 10, 34, DARKGRAY);
-        seconds = (int)(timeEnd - timeStart) % 60;
+        seconds = (int)(timeEnd - timeStart);
         DrawText(TextFormat("TIME PLAYED: %d s", seconds), 20, 40, 34, DARKGRAY);
         break;
     }
@@ -198,4 +222,5 @@ void GameReset(void)
     timeStart = (float)GetTime();
     ResetTiles();
     gameState = STATE_GAME;
+    scoreAdded = false;
 }
