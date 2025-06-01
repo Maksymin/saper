@@ -116,10 +116,22 @@ void GameUpdate(void)
         }
         break;
 
-    case STATE_DEFEAT:
     case STATE_VICTORY:
         if (!scoreAdded) {
+            timeEnd = (float)GetTime();  // Ustaw czas zakończenia
             AddNewScore(timeEnd - timeStart);
+            scoreAdded = true;
+        }
+        if (IsKeyPressed(KEY_ENTER))
+        {
+            PlayGameSound(SOUND_TWO);
+            gameState = STATE_MAIN_MENU;
+        }
+        break;
+
+    case STATE_DEFEAT:
+        if (!scoreAdded) {
+            timeEnd = (float)GetTime();  // Nadal ustaw czas, ale NIE dodawaj wyniku
             scoreAdded = true;
         }
         if (IsKeyPressed(KEY_ENTER))
