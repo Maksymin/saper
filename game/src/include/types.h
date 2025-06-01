@@ -39,6 +39,7 @@ typedef enum {
 typedef enum {
     STATE_MAIN_MENU = 0,
     STATE_OPTIONS,
+    STATE_LEADERBOARD,
     STATE_GAME,
     STATE_DEFEAT,
     STATE_VICTORY
