@@ -119,7 +119,7 @@ void GameUpdate(void)
     case STATE_DEFEAT:
     case STATE_VICTORY:
         if (!scoreAdded) {
-            AddNewScore((int)(timeEnd - timeStart));
+            AddNewScore(timeEnd - timeStart);
             scoreAdded = true;
         }
         if (IsKeyPressed(KEY_ENTER))
@@ -133,7 +133,7 @@ void GameUpdate(void)
 
 void GameRender(void)
 {
-    int seconds = 0;
+    float seconds = 0.0f;
 
     switch (gameState)
     {
@@ -191,8 +191,8 @@ void GameRender(void)
         DrawRectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, Fade(WHITE, 0.8f));
         DrawText(Defeat, WINDOW_WIDTH / 2 - MeasureText(Defeat, 60) / 2, WINDOW_HEIGHT / 2 - 10, 60, DARKGRAY);
         DrawText(EnterPrompt, WINDOW_WIDTH / 2 - MeasureText(EnterPrompt, 34) / 2, (int)(WINDOW_HEIGHT * 0.75f) - 10, 34, DARKGRAY);
-        seconds = (int)(timeEnd - timeStart);
-        DrawText(TextFormat("TIME PLAYED: %d s", seconds), 20, 40, 34, DARKGRAY);
+        seconds = timeEnd - timeStart;
+        DrawText(TextFormat("TIME PLAYED: %.2f s", seconds), 20, 40, 34, DARKGRAY);
         break;
 
     case STATE_VICTORY:
@@ -200,8 +200,8 @@ void GameRender(void)
         DrawRectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, Fade(WHITE, 0.8f));
         DrawText(Victory, WINDOW_WIDTH / 2 - MeasureText(Victory, 60) / 2, WINDOW_HEIGHT / 2 - 10, 60, DARKGRAY);
         DrawText(EnterPrompt, WINDOW_WIDTH / 2 - MeasureText(EnterPrompt, 34) / 2, (int)(WINDOW_HEIGHT * 0.75f) - 10, 34, DARKGRAY);
-        seconds = (int)(timeEnd - timeStart);
-        DrawText(TextFormat("TIME PLAYED: %d s", seconds), 20, 40, 34, DARKGRAY);
+        seconds = timeEnd - timeStart;
+        DrawText(TextFormat("TIME PLAYED: %.2f s", seconds), 20, 40, 34, DARKGRAY);
         break;
     }
 }

@@ -8,7 +8,7 @@
 #define SCORE_FILE "scores.dat"
 
 typedef struct {
-    int seconds;
+    float seconds;
     char date[20];
     char time[9];
     bool isPlaceholder;
@@ -17,7 +17,7 @@ typedef struct {
 void InitLeaderboard(void);
 void SaveLeaderboard(void);
 void LoadLeaderboard(void);
-void AddNewScore(int seconds);
+void AddNewScore(float seconds);
 void RenderLeaderboard(void);
 
 #endif

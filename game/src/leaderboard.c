@@ -33,7 +33,7 @@ void LoadLeaderboard(void) {
     }
 }
 
-void AddNewScore(int seconds) {
+void AddNewScore(float seconds) {
     time_t now;
     struct tm* timeinfo;
     time(&now);
@@ -71,7 +71,7 @@ void RenderLeaderboard(void) {
     for (int i = 0; i < MAX_SCORES; i++) {
         Color color = scores[i].isPlaceholder ? GRAY : WHITE;
         char scoreText[100];
-        sprintf(scoreText, "%2d. %3d sec  %s  %s", 
+        sprintf(scoreText, "%2d. %.2f sec  %s  %s",
                 i + 1, 
                 scores[i].seconds,
                 scores[i].date,
