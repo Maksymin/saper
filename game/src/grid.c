@@ -176,10 +176,12 @@ void RevealTiles(int col, int row)
 
 void FlagTile(int col, int row)
 {
-    if (grid[col][row].isFlagged)
+    if (grid[col][row].isRevealed)
     {
         return;
     }
+
     grid[col][row].isFlagged = !grid[col][row].isFlagged;
+
     PlayGameSound(SOUND_THREE);
 }
